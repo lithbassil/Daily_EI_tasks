@@ -5,12 +5,13 @@ import json
 import time
 from datetime import datetime
 
-TeamsUrl = 'TEAMS WEBHOOK URL'
+
 
 pre_date = datetime.now()
 dt_now = pre_date.strftime("%d/%m/%Y %H:%M:%S")
 
-
+# Notification bu MS Teams webhook
+TeamsUrl = 'TEAMS WEBHOOK URL'
 def TeamsMSG(val):
     msg = {
         'title': 'CUC Job',
@@ -26,23 +27,27 @@ def ConnectSSH(ip, cmd):
     output = net_connect.send_command(cmd)
     return output
 
-qui11 = '100.100.100.1'
-qui12 = '100.100.100.2'
-cmdQ11UP = 'utils network ping'
-cmdQ11Restart = 'utils system restart'
-cmdMakePri = 'utils cuc cluster makeprimary'
-cmdQ12ResTomcat = 'utils service restart Cisco Tomcat'
+
+publisher = '100.100.100.1'
+subscriber = '100.100.100.2'
+nodeStatus = 'utils network ping'
+restartNode = 'utils system restart'
+makePrimary = 'utils cuc cluster makeprimary'
+restartTomcat = 'utils service restart Cisco Tomcat'
 
 username = 'admin'
 password = 'password'
 headers = {'Content-Type': 'application/json'}
-url = 'https://100.100.100.3/mgmt/tm/ltm/pool/~Common~VM_TEST/members/~Common~qui11:443/stats'
+
+# The CUC virtual server in F5 load balance stats url
+url = 'https://100.100.100.3/mgmt/tm/ltm/pool/~Common~VM_TEST/members/~Common~publisher:443/stats'
+
 try:
 
     req = requests.get(url, headers=headers, auth=HTTPBasicAuth(username, password), verify=False)
     req = req.json()
     monitorStatus = \
-        req['entries']['https://localhost/mgmt/tm/ltm/pool/~Common~VM_TEST/members/~Common~qui11:443/stats'][
+        req['entries']['https://localhost/mgmt/tm/ltm/pool/~Common~VM_TEST/members/~Common~publisher:443/stats'][
             'nestedStats'][
             'entries']['monitorStatus']['description']
     status_code = req.status_code
@@ -50,19 +55,19 @@ try:
     if monitorStatus == 'up':
         print('UP')
     else:
-        print('Make QUI12 primary & Restart QUI11 ')
-        output = ConnectSSH(qui12, cmdMakePri)
+        print('Make subscriber primary & Restart publisher ')
+        output = ConnectSSH(subscriber, makePrimary + subscriber)
         print(output)
         time.sleep(10)
-        output = ConnectSSH(qui11, cmdQ11Restart)
+        output = ConnectSSH(publisher, restartNode)
         print(output)
         TeamsMSG(output)
         time.sleep(300)
         try:
-            output = ConnectSSH(quiver11, cmdQ11UP)
+            output = ConnectSSH(publisher, nodeStatus)
             if output == 'PING':
-                ConnectSSH(qui11, cmdMakePri)
-                ConnectSSH(qui11, cmdQ12ResTomcat)
+                ConnectSSH(publisher, makePrimary + publisher)
+                ConnectSSH(subscriber, restartTomcat)
                 TeamsMSG(output)
         finally:
             pass
